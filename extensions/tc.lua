@@ -9544,7 +9544,7 @@ jihan_card=sgs.CreateSkillCard{
 		room:damage(damage)
 		local recover=sgs.RecoverStruct()
 		recover.who=source
-		room:recover(source,recover)
+		room:recover(source,recover)		
 	end,
 }
 
@@ -9562,7 +9562,7 @@ jihan_vs=sgs.CreateViewAsSkill{
 		end
 	end,
 	enabled_at_play=function()
-		return false
+		return sgs.Self:isWounded()
 	end,
 }	
 
@@ -9574,7 +9574,7 @@ jihan=sgs.CreateTriggerSkill{
 		local room=player:getRoom()
 		if player:objectName()==data:toDying().who:objectName() then
 			room:askForUseCard(player,"@@jihan","@jihan")
-		end
+		end	
 	end,		
 }
 
@@ -9611,7 +9611,7 @@ sgs.LoadTranslationTable{
 	["@frozen"]="冰冻",
 	["#donggu"]="%from被冰冻，跳过了其的回合",
 	["jihan"]="饥寒",
-	[":jihan"]="每当你进入濒死状态，你可以弃置一张黑色牌，对一名其他角色造成1点伤害并恢复自己1点体力",
+	[":jihan"]="出牌阶段，若你已受伤，则你可以弃置一张黑色牌，对一名其他角色造成1点伤害并恢复自己1点体力。当你进入濒死状态时，也可以如此做。",
 	["jihan_card"]="饥寒",
 	["@jihan"]="你可以发动饥寒",
 	["~jihan"]="选择一张黑色牌->选择一名其他角色->点击确定",
