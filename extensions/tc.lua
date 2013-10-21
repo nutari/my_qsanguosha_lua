@@ -2703,7 +2703,7 @@ xiongbao=sgs.CreateTriggerSkill{
 
 weizhuang=sgs.CreateTriggerSkill{
 	name="weizhuang",
-	events={sgs.ConfirmDamage,sgs.TurnStart,sgs.GameStart,sgs.BuryVictim},
+	events={sgs.ConfirmDamage,sgs.EventPhaseStart,sgs.GameStart,sgs.BuryVictim},
 	frequency=sgs.Skill_Compulsory,
 	priority=5,
 	can_trigger=function()
@@ -2711,7 +2711,7 @@ weizhuang=sgs.CreateTriggerSkill{
 	end,
 	on_trigger=function(self,event,player,data)
 		local room=player:getRoom()
-		if (event==sgs.TurnStart or event==sgs.GameStart) and player:hasSkill(self:objectName()) then
+		if (event==sgs.EventPhaseStart and player:getPhase()==sgs.Player_Start and player:getMark("@rage")==0 or event==sgs.GameStart) and player:hasSkill(self:objectName()) then
 			local playerx=room:askForPlayerChosen(player,room:getOtherPlayers(player),"weizhuang")
 			local value=sgs.QVariant()
 			value:setValue(playerx)
@@ -6589,17 +6589,25 @@ tcfengyin=sgs.CreateTriggerSkill{
 
 shenghua=sgs.CreateTriggerSkill{
 	name="shenghua",
-	events=sgs.HpChanged,
+	events={sgs.HpChanged,sgs.DrawNCards},
 	frequency=sgs.Skill_Compulsory,
 	on_trigger=function(self,event,player,data)
 		local room=player:getRoom()
-		local x=player:getHp()
-		room:setPlayerProperty(player,"maxhp",sgs.QVariant(math.max(1,x)))
-		if x<=4 and not player:hasSkill("shengnv") then room:acquireSkill(player,"shengnv") end
-		if x<=3 and not player:hasSkill("tianshi") then room:acquireSkill(player,"tianshi") end
-		if x<=2 and not player:hasSkill("shenquan") then room:acquireSkill(player,"shenquan") end
-		if x<=1 and not player:hasSkill("shenwu") then room:acquireSkill(player,"shenwu") end
-		if x<=4 then room:broadcastSkillInvoke("shenghua",5-x) end
+		if event==sgs.HpChanged then
+			local x=player:getHp()
+			room:setPlayerProperty(player,"maxhp",sgs.QVariant(math.max(1,x)))
+			if x<=4 and not player:hasSkill("shengnv") then room:acquireSkill(player,"shengnv") end
+			if x<=3 and not player:hasSkill("tianshi") then room:acquireSkill(player,"tianshi") end
+			if x<=2 and not player:hasSkill("shenquan") then room:acquireSkill(player,"shenquan") end
+			if x<=1 and not player:hasSkill("shenwu") then room:acquireSkill(player,"shenwu") end
+			if x<=4 then room:broadcastSkillInvoke("shenghua",5-x) end
+		else
+			local x=data:toInt()
+			i=math.max(0,5-player:getHp())
+			if i>4 then i=4 end
+			data:setValue(x+i)
+			return
+		end	
 	end,
 }
 
@@ -6811,7 +6819,9 @@ sgs.LoadTranslationTable{
 	体力不高于4时：圣女：<b>锁定技</b>，离你距离1以上的角色不能对你造成伤害且【杀】和非延时锦囊对你无效,你跳过判定和弃牌阶段\
 	体力不高于3时：天使：<b>锁定技</b>，你即将造成的伤害均视为雷电伤害并且伤害+1。雷电伤害对你无效，你受到的伤害均-1且不大于1\
 	体力不高于2时：神权：<b>锁定技</b>，你的【杀】无视防具且不能被躲闪。你与其他角色计算距离时始终为1，其他角色与你计算距离时始终+1（不能和+1马叠加）\
-	体力不高于1时：神无：<b>锁定技</b>，除你以外的角色体力变动时，其体力上限立刻变动至与其体力相同（为0则即死），你的体力上限不小于1",
+	体力不高于1时：神无：<b>锁定技</b>，除你以外的角色体力变动时，其体力上限立刻变动至与其体力相同（为0则即死），你的体力上限不小于1\
+	\
+	此外，每从升华获得一个技能，摸牌阶段多摸一张牌",
 	["$shenghua1"]="我的新招怎样",
 	["$shenghua2"]="我还能更强哦",
 	["$shenghua3"]="是时候拿出真本事了",
@@ -9503,6 +9513,7 @@ donggu=sgs.CreateTriggerSkill{
 	name="donggu",
 	events={sgs.Damaged,sgs.TurnStart},
 	frequency=sgs.Skill_Compulsory,	
+	priority=5,
 	can_trigger=function()
 		return true
 	end,
