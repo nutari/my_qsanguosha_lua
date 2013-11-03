@@ -5233,7 +5233,7 @@ sgs.LoadTranslationTable{
 
 --☆ユー
 
-TCX02=sgs.General(extension, "TCX02", "forbidden", "2", false,true)
+TCX02=sgs.General(extension, "TCX02", "god", "2", false,true)
 
 shenge=sgs.CreateTriggerSkill{
 	name="shenge",
@@ -5266,7 +5266,7 @@ shenge=sgs.CreateTriggerSkill{
 		end
 		local damage=data:toDamage()
 		if event==sgs.ConfirmDamage or event==sgs.DamageForseen then
-			if damage.from:hasSkill(self:objectName()) then
+			if damage.from and damage.from:hasSkill(self:objectName()) then
 				local log=sgs.LogMessage()
 				log.from=damage.from
 				log.type="#shengepd"
@@ -5274,14 +5274,14 @@ shenge=sgs.CreateTriggerSkill{
 				damage.from=nil
 				data:setValue(damage)
 				return false
-			elseif damage.to:hasSkill(self:objectName()) and damage.from then
+			elseif damage.from and damage.to:hasSkill(self:objectName()) then
 				local log=sgs.LogMessage()
 				log.from=damage.to
 				log.type="#shengead"
 				room:sendLog(log)
 				damage.from=nil
-				room:damage(damage)
-				return true
+				data:setValue(damage)
+				return false
 			end
 		end
 		if event==sgs.PreHpReduced and damage.to:hasSkill(self:objectName()) then
@@ -5344,8 +5344,7 @@ shijie=sgs.CreateTriggerSkill{
 	end,
 	on_trigger=function(self,event,player,data)
 		local room=player:getRoom()
-		local damage=data:toDamage()
-		if (event==sgs.EventPhaseStart and player:getPhase()==sgs.Player_Finish and player:hasSkill(self:objectName())) or (event==sgs.Damaged and damage.damage>0 and damage.to:hasSkill(self:objectName()))then
+		if (event==sgs.EventPhaseStart and player:getPhase()==sgs.Player_Finish and player:hasSkill(self:objectName())) or (event==sgs.Damaged and data:toDamage().damage>0 and data:toDamage().to:hasSkill(self:objectName()))then
 			room:setPlayerFlag(player,"-shengex")
 			local log=sgs.LogMessage()
 			log.from=player
@@ -5371,7 +5370,7 @@ shijie=sgs.CreateTriggerSkill{
 		if not yuu then return false end
 		if event==sgs.CardsMoving then
 			local move=data:toMoveOneTime()
-			if move.card_ids:isEmpty() or move.to:objectName()~=player:objectName() or player:getPhase()==sgs.Player_Draw then return end
+			if move.card_ids:isEmpty() or move.to and move.to:objectName()~=player:objectName() or player:getPhase()==sgs.Player_Draw then return end
 			if yuu:objectName()==player:objectName() or move.to_place~=sgs.Player_PlaceHand then return false end
 			reason=sgs.CardMoveReason()
 			reason.m_reason=sgs.CardMoveReason_S_REASON_DISMANTLE
@@ -6555,9 +6554,14 @@ tcfengyin=sgs.CreateTriggerSkill{
 		local mizuki=room:findPlayerBySkillName(self:objectName())
 		if mizuki and (event==sgs.Predamage or event==sgs.DamageForseen and (data:toDamage().transfer or data:toDamage().chain)) then
 			local damage=data:toDamage()
-			if damage.from:objectName()==mizuki:objectName() and damage.to:getMark("@forbidden")==0 and damage.from:objectName()~=damage.to:objectName() and room:askForSkillInvoke(mizuki,self:objectName(),data) then
+			if (damage.from:objectName()==mizuki:objectName() and damage.to:getMark("@forbidden")==0 or damage.to:objectName()==mizuki:objectName() and damage.from and damage.from:getMark("@forbidden")==0 )and damage.from:objectName()~=damage.to:objectName() and room:askForSkillInvoke(mizuki,self:objectName(),data) then
 				room:broadcastSkillInvoke("tcfengyin")
-				local target=damage.to
+				local target
+				if damage.from:objectName()==mizuki:objectName() then
+					target=damage.to
+				else
+					target=damage.from
+				end	
 				local tmp={skills={},player}
 				tmp.player=target
 				for _,skill in sgs.qlist(target:getVisibleSkillList()) do
@@ -6809,13 +6813,13 @@ sgs.LoadTranslationTable{
 	["#TCA01"]="死神の妹",
 	["~TCA01"]="あ、お姉さま",
 	["tcfengyin"]="封印",
-	[":tcfengyin"]="你即将对其他角色造成伤害前，可以移除其所有武将技能。被此法移除的武将技能，在你下回合回合开始或者你死亡时全部返回",
+	[":tcfengyin"]="你即将对其他角色造成伤害前或者你即将受到其他角色伤害前，可以移除其所有武将技能。被此法移除的武将技能，在你下回合回合开始或者你死亡时全部返回",
 	["#tcfengyin"]="你可以弃置一张牌（包括装备）封印%src的技能",
 	["$tcfengyin1"]="动不了的感觉如何？",
 	["$tcfengyin2"]="太弱了。",
 	["@forbidden"]="禁",
 	["shenghua"]="升华",
-	[":shenghua"]="<b>锁定技</b>，你的体力变化时，你将体力上限减至和体力相同的数值(最小为1)。当你的体力小于特定数值时，分别获得如下技能：\
+	[":shenghua"]="<b>锁定技</b>，你的体力变化时，你将体力上限减至和体力相同的数值(最小为1)。当你的体力不高于特定数值时，分别获得如下技能：\
 	体力不高于4时：圣女：<b>锁定技</b>，离你距离1以上的角色不能对你造成伤害且【杀】和非延时锦囊对你无效,你跳过判定和弃牌阶段\
 	体力不高于3时：天使：<b>锁定技</b>，你即将造成的伤害均视为雷电伤害并且伤害+1。雷电伤害对你无效，你受到的伤害均-1且不大于1\
 	体力不高于2时：神权：<b>锁定技</b>，你的【杀】无视防具且不能被躲闪。你与其他角色计算距离时始终为1，其他角色与你计算距离时始终+1（不能和+1马叠加）\
@@ -8173,7 +8177,7 @@ tianyun=sgs.CreateTriggerSkill{
 				data:setValue(judge)
 			else
 				local yumemi=room:findPlayerBySkillName(self:objectName())
-				if yumemi and not yumemi:isNude() and room:askForCard(yumemi,"..","@tianyun:"..judge.who:objectName(),data,sgs.Card_MethodDiscard) then
+				if yumemi and room:askForSkillInvoke(yumemi,self:objectName(),data) then
 					local choice=room:askForChoice(yumemi,self:objectName(),"good+bad")
 					judge.pattern=sgs.QRegExp("(.*):(.*):(.*)")
 					local log=sgs.LogMessage()
@@ -8394,9 +8398,8 @@ sgs.LoadTranslationTable{
 	["#TCA08"]="無限可能の少女",
 	["~TCA08"]="さくらさん、みずきさん、あたしもおわりだ",
 	["tianyun"]="天运",
-	[":tianyun"]="你的判定始终为好，其他角色判定时，你可以弃置1张牌，然后无论判定牌时什么，你可以令判定结果为好或者不好。你不会受到没有来源的伤害",
+	[":tianyun"]="你的判定始终为好。其他角色判定时，无论判定牌时什么，你可以令判定结果为好或者不好。你不会受到没有来源的伤害",
 	["#tianyun"]="%from的【天运】触发，伤害无效",
-	["@tianyun"]="你可以弃置一张牌确定%src的判定结果",
 	["good"]="好",
 	["bad"]="坏",
 	["#tianyung"]="%from发动了【天运】，%to的%arg判定结果确定为好",
