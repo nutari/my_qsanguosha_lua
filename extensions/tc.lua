@@ -3549,7 +3549,7 @@ canming=sgs.CreateTriggerSkill{
 			log.type="#canmingx"
 			room:sendLog(log)
 			if(kei:getMaxHp()<5)then
-				room:setPlayerProperty(kei,"maxhp",sgs.QVariant(math.max(kei:getMaxHp()+1,5)))
+				room:setPlayerProperty(kei,"maxhp",sgs.QVariant(math.min(kei:getMaxHp()+1,5)))
 			end	
 			local recover=sgs.RecoverStruct()
 			recover.who=kei
@@ -7588,15 +7588,6 @@ liuzhuan=sgs.CreateTriggerSkill{
 	end,
 }
 
-niansui_distance=sgs.CreateDistanceSkill{
-	name="#niansui_distance",
-	correct_func=function(self,from,to)
-		if from:getMark("@broken")>0 then
-			return from:getMark("@broken")
-		end
-	end,
-}
-
 niansui_card=sgs.CreateSkillCard{
 	name="niansui_card",
 	target_fixed=false,
@@ -7621,7 +7612,7 @@ niansui_vs=sgs.CreateViewAsSkill{
 
 niansui=sgs.CreateTriggerSkill{
 	name="niansui",
-	events={sgs.Damaged,sgs.BuryVictim},
+	events={sgs.Dying,sgs.BuryVictim,sgs.PreHpRecover},
 	frequency=sgs.Skill_NotFrequent,
 	view_as_skill=niansui_vs,
 	can_trigger=function()
@@ -7630,9 +7621,9 @@ niansui=sgs.CreateTriggerSkill{
 	on_trigger=function(self,event,player,data)
 		local room=player:getRoom()
 		local hinata=room:findPlayerBySkillName("niansui")
-		if event==sgs.Damaged then
-			local damage=data:toDamage()
-			if not hinata or player:objectName()==hinata:objectName() or damage.damage<=1 or player:isDead() then return end
+		if event==sgs.Dying then
+			if player:objectName()~=data:toDying().who:objectName() then return end
+			if player:objectName()==hinata:objectName() then return end
 			if not room:askForSkillInvoke(hinata,"niansui",data) then return end
 			player:gainMark("@broken")
 			if player:getMark("@broken")>=3 then
@@ -7644,6 +7635,18 @@ niansui=sgs.CreateTriggerSkill{
 				room:killPlayer(player)
 			end
 		end
+		if event==sgs.PreHpRecover and player:getMark("@broken")>0 then
+			local rec=data:toRecover()
+			if rec.recover>player:getLostHp()-player:getMark("@broken") then
+				local log=sgs.LogMessage()
+				log.from=hinata
+				log.to:append(player)
+				log.type="#niansuixx"
+				room:sendLog(log)
+				rec.recover=math.max(0,player:getLostHp()-player:getMark("@broken"))
+				if rec.recover==0 then return true else data:setValue(rec) return false end
+			end			
+		end
 		if event==sgs.BuryVictim and player:getMark("@broken")>0 and hinata then
 			local log=sgs.LogMessage()
 			log.from=hinata
@@ -7654,13 +7657,19 @@ niansui=sgs.CreateTriggerSkill{
 			recover.who=player
 			recover.recover=player:getMark("@broken")
 			room:recover(hinata,recover)
+		end
+		if event==sgs.BuryVictim and player:objectName()==hinata:objectName() then
+			for _,p in sgs.qlist(room:getAllPlayers()) do
+				if p:getMark("@broken")>0 then
+					p:loseAllMarks("@broken")
+				end
+			end
 		end	
 	end,
 }
 
 TCA04:addSkill(fuying)
 TCA04:addSkill(liuzhuan)
-TCA04:addSkill(niansui_distance)
 TCA04:addSkill(niansui)
 TCA04:addSkill("lianxie")
 
@@ -7685,9 +7694,10 @@ sgs.LoadTranslationTable{
 	["#niansui_distance"]="碾碎",
 	["niansui_card"]="碾碎",
 	["niansui"]="碾碎",
-	[":niansui"]="每当一个你以外的角色受到一次超过1点的伤害后，你可以将1枚破碎标记至于其面前。面前每有1个破碎标记，其与其他角色计算距离时均+1。当一个角色获得第3枚破碎标记时，其立刻死亡。任何带有破碎标记的角色死亡时，其令你恢复等同于破碎标记数的体力。出牌阶段内，你可以移除其他角色面前的1枚破碎标记，然后你恢复1点体力。",
+	[":niansui"]="每当一名角色进入濒死状态时，你可以将一枚破碎标记置于其面前，目标恢复体力时，体力不会超过其最大生命减去其破碎标记数的量。当一个角色获得第3枚破碎标记时，其立刻死亡。任何带有破碎标记的角色死亡时，其令你恢复等同于破碎标记数的体力。出牌阶段内，你可以移除其他角色面前的1枚破碎标记，然后你恢复1点体力。",
 	["#niansui"]="%from的【碾碎】触发，%to即死",
 	["#niansuix"]="%from的【碾碎】触发",
+	["#niansuixx"]="%from的【碾碎】触发，%to的体力恢复被吸收",
 	["@broken"]="破碎",
 	["designer:TCA04"]="Nutari",
 	["illustrator:TCA04"]="てぃんくる",
@@ -8378,6 +8388,7 @@ hunhuo=sgs.CreateTriggerSkill{
 				damage.damage=1
 				damage.to=p
 				room:damage(damage)
+				p:throwAllHandCardsAndEquips()
 			end
 			room:askForUseCard(player,"@@minglun","@minglun")
 			return true
@@ -8415,7 +8426,7 @@ sgs.LoadTranslationTable{
 	["#minglunx"]="%from的【命轮】触发，%from即将受到的伤害转移至%to",
 	["@wheel"]="命轮",
 	["hunhuo"]="魂火",
-	[":hunhuo"]="<b>觉醒技</b>，当你濒死求桃后依旧濒死时，你将体力和上限调整至1点，弃置所有手牌和装备并摸4张牌，重置并翻至正面朝上，然后获得【封印】【圣女】，然后所有其他角色受到1点没有来源的火焰伤害，然后你可以立刻发动一次命轮",
+	[":hunhuo"]="<b>觉醒技</b>，当你濒死求桃后依旧濒死时，你将体力和上限调整至1点，弃置所有手牌和装备并摸4张牌，重置并翻至正面朝上，然后获得【封印】【圣女】，然后所有其他角色受到1点没有来源的火焰伤害并弃置所有手牌与装备，然后你可以立刻发动一次命轮的拼点。",
 	["designer:TCA08"]="Nutari",
 	["illustrator:TCA08"]="てぃんくる",
 }

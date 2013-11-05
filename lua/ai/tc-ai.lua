@@ -2,6 +2,7 @@ function SmartAI:immunityRecover(player)
 	local player=player or self.player
 	if player:getMark("@wheel")>0 then return true end
 	if player:hasSkill("saiganran") then return true end
+	if player:getLostHp()<=player:getMark("@broken") then return true end
 	return false
 end
 
@@ -1783,8 +1784,8 @@ sgs.ai_skill_invoke.tongshi=function(self,data)
 end	
 
 sgs.ai_skill_invoke.niansui=function(self,data)
-	local damage=data:toDamage()
-	if not self:isFriend(damage.to) then return true end
+	local dying=data:toDying()
+	if not self:isFriend(dying.who) then return true end
 	return false
 end	
 
@@ -2040,3 +2041,8 @@ sgs.ai_skill_use["@@liuzhuan"]=function(self,prompt)
 		return "#liuzhuan_card:.:->"..enemies[1]:objectName()
 	end	
 end
+
+sgs.ai_skill_invoke.fenhui=function(self,data)
+	if self:isEnemy(self.room:getCurrent()) then return true  end
+	return false
+end	
