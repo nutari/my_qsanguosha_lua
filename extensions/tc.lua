@@ -1364,100 +1364,84 @@ bing=sgs.CreateTriggerSkill{
 			player:gainMark("@waked")
 			player:gainMark("bing")
 			room:loseMaxHp(player)
-			room:acquireSkill(player,"xiexin")
-			room:acquireSkill(player,"#xiexin_tr")
+			room:acquireSkill(player,"CP")
 		end
 	end,
 }
 
-xiexin_distance=sgs.CreateDistanceSkill{
-	name="#xiexin_distance",
-	correct_func=function(self,from,to)
-		if not from:getPile("jiao"):isEmpty() then
-			return -from:getPile("jiao"):length()
-		end
-	end,
-}
-
-xiexin_card=sgs.CreateSkillCard{
-	name="xiexin_card",
+CP_card=sgs.CreateSkillCard{
+	name="CP_card",
 	target_fixed=false,
 	will_throw=false,
 	filter=function(self,targets,to_select)
-		return #targets==0 and to_select:objectName()~=sgs.Self:objectName() and not to_select:isKongcheng()
+		return #targets<2 and not to_select:isKongcheng()
 	end,
+	feasible=function(self,targets)
+		return #target==2
+	end,	
 	on_use=function(self,room,source,targets)
-		local target=targets[1]
-		room:setPlayerFlag(source,"xiexinused")
-		source:loseMark("@fu")
-		local suit=room:askForSuit(source,"xiexin")
-		local log=sgs.LogMessage()
-		log.from=source
-		log.arg=sgs.Card_Suit2String(suit)
-		log.type="#xiexin"
-		room:sendLog(log)
-		room:showAllCards(target)
-		room:getThread():delay()		
-		local list=sgs.IntList()
-		for _,card in sgs.qlist(target:getHandcards()) do
-			if card:getSuit()==suit then list:append(card:getEffectiveId()) end
+		local id={}
+		for i=1,2,1 do
+			id[i]=room:askForCardChosen(source,target[i],"h","CP")
 		end
-		if list:length()==0 then 
-			room:loseHp(target)
+		room:showCard(target[1],id[1])
+		room:showCard(target[2],id[2])
+		if sgs.Sanguosha:getCard(id[1]):getSuit()==sgs.Sanguosha2:getCard(id[1]):getSuit() then
+			local recover=sgs.RecoverStruct()
+			recover.who=source
+			room:recover(target[1],recover,true)
+			room:recover(target[2],recover,true)
 		else
-			local move=sgs.CardsMoveStruct()
-			move.from=target
-			move.from_place=sgs.Player_PlaceHand
-			move.to=source
-			move.to_place=sgs.Player_PlaceHand
-			move.card_ids=list
-			move.reason=sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_ROB,source:objectName())
-			room:moveCardsAtomic(move,true)
-			if list:length()>1 then
-				if suit==sgs.Card_Heart then
-					local recover=sgs.RecoverStruct()
-					recover.who=source
-					room:recover(target,recover)
-				elseif suit==sgs.Card_Spade then
-					room:loseHp(source)
-				elseif suit==sgs.Card_Diamond then
-					target:drawCards(2)
-				elseif not source:isKongcheng() then
-					local x=math.min(2,source:getHandcardNum())
-					room:askForDiscard(source,"xiexin",x,x)
-				end
+			local moves=sgs.CardsMoveList()
+			local reason=sgs.CardMoveReason()
+			reason.m_reason=sgs.CardMoveReason_S_REASON_ROB
+			reason.m_skillName="CP"
+			reason.m_player=source:objectName()
+			for i=1,2,1 do
+				local move=sgs.CardsMoveStruct()
+				move.card_ids:append(id[i])
+				move.reason=reason
+				move.to=source
+				move.to_place=sgs.Player_PlaceHand
+				moves:append(move)				
 			end
+			room:moveCardsAtomic(moves,false)
+			local targetlist=sgs.SPlayerList()
+			targetlist:append(targets[1])
+			targetlist:append(targets[2])
+			local target=room:askForPlayerChosen(source,targetlist,"CP")
+			target:loseHp(1)
 		end	
 	end,		
 }
 
-xiexin_vs=sgs.CreateViewAsSkill{
-	name="xiexin",
+CP_vs=sgs.CreateViewAsSkill{
+	name="CP",
 	n=0,
 	view_as=function()
-		return xiexin_card:clone()
+		return CP_card:clone()
 	end,
 	enabled_at_play=function()
-		return sgs.Self:getMark("@fu")>0 and not sgs.Self:hasFlag("xiexinused")
+		return sgs.Self:getMark("@fu")>0 and not sgs.Self:hasFlag("CPused")
 	end,
 }
 
-xiexin=sgs.CreateTriggerSkill{
-	name="xiexin",
+CP=sgs.CreateTriggerSkill{
+	name="CP",
 	events={sgs.EventPhaseEnd},
-	view_as_skill=xiexin_vs,
+	view_as_skill=CP_vs,
 	on_trigger=function(self,event,player,data)
 		local room=player:getRoom()
 		if player:getPhase()==sgs.Player_Play then
-			room:setPlayerFlag(player,"-xiexinused")			
+			room:setPlayerFlag(player,"-CPused")			
 		end		
 	end,
 }
 
-local skill=sgs.Sanguosha:getSkill("xiexin")
+local skill=sgs.Sanguosha:getSkill("CP")
 if not skill then
         local skillList=sgs.SkillList()
-        skillList:append(xiexin)
+        skillList:append(CP)
         sgs.Sanguosha:addSkills(skillList)
 end
 
@@ -1465,7 +1449,6 @@ TC005:addSkill(fei)
 TC005:addSkill(fu)
 TC005:addSkill(zhai)
 TC005:addSkill(bing)
-TC005:addSkill(xiexin_distance)
 
 sgs.LoadTranslationTable{
 	["TC005"]="椎名真冬",
@@ -1486,14 +1469,12 @@ sgs.LoadTranslationTable{
 	["#zhai"]="%from的手牌数（%arg）超过了10张，触发了【宅】",
 	["#zhaix"]="【宅】被触发，%from跳过了%arg阶段。",
 	["bing"]="病",
-	[":bing"]="<b>觉醒技</b>，回合开始时，若你的“腐”标记不少于3个，则需失去1点体力上限，然后获得【邪心】\
-	【邪心】:出牌阶段，你可以弃置1枚“腐”标记并选择1名其他角色。你选择一种花色，然后展示其所有的手牌，若其中有你所选花色的牌，你全部获得之，并且若你获得的牌数不少于两张，则根据所选花色的不同，执行以下操作：红桃，目标恢复1点体力；方块，目标摸2张牌；黑桃，你失去1点体力；梅花，你弃置2张手牌（不足全弃，没有不弃）。若没有所述花色的牌，则其失去1点体力。一阶段限一次。",
+	[":bing"]="<b>觉醒技</b>，回合开始时，若你的“腐”标记不少于3个，则需失去1点体力上限，然后获得【CP】\
+	【CP】:出牌阶段，你可以弃置2枚“腐”标记并选择2名有手牌的角色。你展示双方各一张手牌，若所展示的牌花色相同，则双方各恢复1点体力，否则你获得双方展示的牌，并另其中一方失去1点体力。一阶段限一次。",
 	["#bing"]="%from的“腐”标记数（%arg）不少于3，触发【病】",
-	["#xiexin_distance"]="邪心",
-	["xiexin_card"]="邪心",
-	["xiexin"]="邪心",
-	[":xiexin"]="出牌阶段，你可以弃置1枚“腐”标记并选择1名其他角色。你选择一种花色，然后展示其所有的手牌，若其中有你所选花色的牌，你全部获得之，并且若你获得的牌数不少于两张，则根据所选花色的不同，执行以下操作：红桃，目标恢复1点体力；方块，目标摸2张牌；黑桃，你失去1点体力；梅花，你弃置2张手牌（不足全弃，没有不弃）。若没有所述花色的牌，则其失去1点体力。一阶段限一次。",
-	["#xiexin"]="%from选择了%arg牌",
+	["CP_card"]="CP",
+	["CP"]="CP",
+	[":CP"]="出牌阶段，你可以弃置2枚“腐”标记并选择2名有手牌的角色。你展示双方各一张手牌，若所展示的牌花色相同，则双方各恢复1点体力，否则你获得双方展示的牌，并另其中一方失去1点体力。一阶段限一次。",
 	["designer:TC005"]="Nutari",
 	["illustrator:TC005"]="狗神煌",
 }
